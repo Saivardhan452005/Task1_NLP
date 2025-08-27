@@ -1,0 +1,73 @@
+import nltk
+from nltk.tokenize import word_tokenize
+import os
+
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
+# The error indicates that 'punkt_tab' is needed for tokenization
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab')
+
+
+text_nltk = "Tokenization without transformers is straightforward with tools like NLTK."
+nltk_tokens = word_tokenize(text_nltk)
+print("NLTK Tokens:", nltk_tokens)
+
+try:
+    from transformers import AutoTokenizer
+except ImportError:
+    print("The 'transformers' library is not installed. Please install it.")
+    exit()
+
+return_tensors_framework = None
+try:
+    import torch
+    return_tensors_framework = "pt"
+except ImportError:
+    try:
+        import tensorflow as tf
+        return_tensors_framework = "tf"
+    except ImportError:
+        pass # Neither PyTorch nor TensorFlow found
+
+try:
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+except OSError:
+    print("Could not load 'bert-base-uncased' model. Check internet or model name.")
+    exit()
+
+text_transformers = "Tokenization without transformers is straightforward with tools like NLTK."
+transformers_output = tokenizer(text_transformers, return_tensors=return_tensors_framework)
+print("Transformers Raw Output:", transformers_output)
+
+input_ids_list = None
+if return_tensors_framework == "pt":
+    input_ids_list = transformers_output['input_ids'][0].tolist()
+elif return_tensors_framework == "tf":
+    input_ids_list = transformers_output['input_ids'][0].numpy().tolist()
+else: # Fallback if no framework or return_tensors=None
+    if 'input_ids' in transformers_output and len(transformers_output['input_ids']) > 0:
+        if isinstance(transformers_output['input_ids'][0], list): # Already a list of lists
+            input_ids_list = transformers_output['input_ids'][0]
+        else: # Likely a single list directly
+            input_ids_list = list(transformers_output['input_ids'][0]) # Ensure it's a list for convert_ids_to_tokens
+    else:
+        # Handle cases where input_ids might not be directly accessible or structured as expected
+        # This might need adjustment based on specific tokenizer's default non-tensor output
+        print("Warning: Could not reliably extract input_ids as a list. Attempting direct access.")
+        try:
+            input_ids_list = transformers_output['input_ids'][0] # Try direct access
+        except (KeyError, IndexError):
+            print("Error: 'input_ids' not found or empty in transformer output.")
+            input_ids_list = [] # Fallback to empty list
+
+transformers_token_list = tokenizer.convert_ids_to_tokens(input_ids_list)
+print("Transformers Tokens (List):", transformers_token_list)
+
+decoded_text = tokenizer.decode(input_ids_list, skip_special_tokens=True)
+print("Decoded Text:", decoded_text)
